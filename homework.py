@@ -9,7 +9,12 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exceptions import MessageSentError, ResponseError, HomeworksIsNotListError, NoRequiredTokens
+from exceptions import (
+    MessageSentError,
+    ResponseError,
+    HomeworksIsNotListError,
+    NoRequiredTokens
+)
 
 load_dotenv()
 
@@ -82,7 +87,7 @@ def parse_status(homework):
     """Получение из ответа API необходимых данных."""
     name_error_message = 'Нет имени домашней работы'
     status_error_message = 'Пришёл некорректный статус проверки'
-    
+
     if homework:
         if isinstance(homework, dict):
             last_homework = homework
