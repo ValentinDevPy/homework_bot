@@ -10,10 +10,9 @@ import telegram
 from dotenv import load_dotenv
 
 from exceptions import (
-    MessageSentError,
-    ResponseError,
-    HomeworksIsNotListError,
-    NoRequiredTokens
+    MessageSentError, ResponseError, HomeworksIsNotListError,
+    NoRequiredTokensError, EmptyHomeworksError, ResponseIsNotDictError,
+    NoHomeworkKeyInResponseError, NoCurrentDateKeyInResponseError,
 )
 
 load_dotenv()
@@ -52,33 +51,48 @@ def get_api_answer(current_timestamp: int):
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
-        logger.info('Отправлен запрос к API Яндекс.Домашки')
+        logger.info(
+            f'Отправлен запрос к API Яндекс.Домашки с параметрами: {params}'
+        )
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
         if response.status_code != HTTPStatus.OK:
-            error_message = 'Эндпоинт API Яндекс.Домашка недоступен'
-            logger.error(error_message)
-            raise ResponseError(error_message)
+            raise ResponseError('Код ответа отличается от 200')
         return response.json()
     except Exception as error:
         logger.error(f'Ошибка при запросе {error}')
-        raise ResponseError('Ошибка при запросе к API Яндекс.Домашка')
+        raise ResponseError(
+            f'Ошибка при запросе к API Яндекс.Домашка: {error}'
+        )
 
 
 def check_response(response):
     """Провека ответа внешнего API на соответсвие необходимому формату."""
     if isinstance(response, list):
         response = response[0]
+
+    if not isinstance(response, dict):
+        logger.error('Ответ пришел не в виде словаря.')
+        raise ResponseIsNotDictError('Ответ пришел не в виде словаря.')
+
+    if 'homeworks' not in response:
+        logger.error('Нет ключа homeworks')
+        raise NoHomeworkKeyInResponseError(
+            'Ответ не содержит ключа homeworks'
+        )
+
+    if 'current_date' not in response:
+        logger.error('Нет ключа current_date')
+        raise NoCurrentDateKeyInResponseError(
+            'Ответ не содержит ключа current_date'
+        )
+
     if not isinstance(response.get('homeworks'), list):
         logger.error('Домашние работы пришли не в виде списка')
         raise HomeworksIsNotListError(
             'Домашние работы пришли не в виде списка'
         )
-    if (
-            isinstance(response, dict)
-            and 'homeworks' in response
-            and 'current_date' in response
-    ):
-        return response.get('homeworks')
+
+    return response['homeworks']
 
 
 def parse_status(homework):
@@ -86,21 +100,28 @@ def parse_status(homework):
     name_error_message = 'Нет имени домашней работы'
     status_error_message = 'Пришёл некорректный статус проверки'
 
-    if homework:
-        if isinstance(homework, dict):
-            last_homework = homework
-        else:
-            last_homework = homework[0]
-        if 'homework_name' not in last_homework:
-            logger.error(name_error_message)
-            raise KeyError(name_error_message)
-        homework_name = last_homework.get('homework_name')
-        homework_status = last_homework.get('status')
-        if homework_status not in HOMEWORK_STATUSES:
-            logger.error(status_error_message)
-            raise KeyError(status_error_message)
-        verdict = HOMEWORK_STATUSES.get(homework_status)
-        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    if not homework:
+        logger.debug('Нет проверенных домашних работы.')
+        raise EmptyHomeworksError('Нет проверенных домашних работ.')
+
+    if isinstance(homework, dict):
+        last_homework = homework
+    else:
+        last_homework = homework[0]
+
+    if 'homework_name' not in last_homework:
+        logger.error(name_error_message)
+        raise KeyError(name_error_message)
+
+    homework_name = last_homework['homework_name']
+    homework_status = last_homework.get('status')
+
+    if homework_status not in HOMEWORK_STATUSES:
+        logger.error(status_error_message)
+        raise KeyError(status_error_message)
+
+    verdict = HOMEWORK_STATUSES[homework_status]
+    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens():
@@ -114,7 +135,7 @@ def main():
     if not check_tokens():
         tokens_error_message = 'Отсутствует один или несколько токенов'
         logger.critical(tokens_error_message)
-        raise NoRequiredTokens(tokens_error_message)
+        raise NoRequiredTokensError(tokens_error_message)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
     while True:
