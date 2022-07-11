@@ -6,16 +6,19 @@
 ```
 
 ### Технологии:
-- Python 3.9
-- python-dotenv 0.19.0
-- python-telegram-bot 13.7
+- flake8==3.9.2
+- flake8-docstrings==1.6.0
+- pytest==6.2.5
+- python-dotenv==0.19.0
+- python-telegram-bot==13.7
+- requests==2.26.0
 
 ### Как запустить проект:
 
 Клонировать репозиторий и перейти в него в командной строке:
 
 ```
-git clone https://github.com/Drvmnekta/homework_bot.git
+git clone https://github.com/ValentinDevPy/homework_bot.git
 ```
 
 ```
